@@ -129,8 +129,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# imgs
-
+# images
 *.png
 *.jpg
 *.jpeg
@@ -138,6 +137,12 @@ dmypy.json
 *.npy
 *.pt
 *.pth
+
+!HybridGNet/imgs/*
+!Medical-SAM-Adapter/figs/*
+!MedSAM/assets/*
+!UNet++/figs/*
+!MedSegDiff/figs/*
 
 #Chkpts
 *logs/
