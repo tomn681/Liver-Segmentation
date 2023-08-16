@@ -49,15 +49,21 @@ def main():
     if args.data_name == 'ISIC':
         tran_list = [transforms.Resize((args.image_size,args.image_size)), transforms.ToTensor(),]
         transform_test = transforms.Compose(tran_list)
-
         ds = ISICDataset(args, args.data_dir, transform_test, mode = 'Test')
         args.in_ch = 4
+
     elif args.data_name == 'BRATS':
         tran_list = [transforms.Resize((args.image_size,args.image_size)),]
         transform_test = transforms.Compose(tran_list)
-
         ds = BRATSDataset3D(args.data_dir,transform_test)
         args.in_ch = 5
+
+    elif args.data_name == 'LIVER':
+        tran_list = [A.Resize(args.image_size,args.image_size),]
+        transform_train = A.Compose(tran_list)
+        ds = LiverDataset(args, args.data_dir, transform_train)
+        args.in_ch = 2
+
     datal = th.utils.data.DataLoader(
         ds,
         batch_size=args.batch_size,
@@ -98,7 +104,8 @@ def main():
         elif args.data_name == 'BRATS':
             # slice_ID=path[0].split("_")[2] + "_" + path[0].split("_")[4]
             slice_ID=path[0].split("_")[-3] + "_" + path[0].split("slice")[-1].split('.nii')[0]
-
+        elif args.data_name == 'LIVER':
+            slice_ID=path[0].split("/")[-1].split('.')[0]
         logger.log("sampling...")
 
         start = th.cuda.Event(enable_timing=True)

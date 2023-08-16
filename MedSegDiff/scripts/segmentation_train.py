@@ -7,6 +7,7 @@ from guided_diffusion import dist_util, logger
 from guided_diffusion.resample import create_named_schedule_sampler
 from guided_diffusion.bratsloader import BRATSDataset, BRATSDataset3D
 from guided_diffusion.isicloader import ISICDataset
+from guided_diffusion.liverloader import LiverDataset
 from guided_diffusion.custom_dataset_loader import CustomDataset
 from guided_diffusion.script_util import (
     model_and_diffusion_defaults,
@@ -17,8 +18,9 @@ from guided_diffusion.script_util import (
 import torch as th
 from guided_diffusion.train_util import TrainLoop
 from visdom import Visdom
-viz = Visdom(port=8850)
+#viz = Visdom(port=8850)
 import torchvision.transforms as transforms
+import albumentations as A
 
 def main():
     args = create_argparser().parse_args()
@@ -34,6 +36,16 @@ def main():
 
         ds = ISICDataset(args, args.data_dir, transform_train)
         args.in_ch = 4
+    if args.data_name == 'LIVER':
+        tran_list = [
+            A.Resize(args.image_size,args.image_size),
+	    A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0.1, p=0.5),
+            A.HorizontalFlip(p=0.5),
+            A.Rotate (limit=10, interpolation=1, border_mode=1, value=None, crop_border=False, always_apply=False, p=0.5),
+        ]
+        transform_train = A.Compose(tran_list)
+        ds = LiverDataset(args, args.data_dir, transform_train)
+        args.in_ch = 2
     elif args.data_name == 'BRATS':
         tran_list = [transforms.Resize((args.image_size,args.image_size)),]
         transform_train = transforms.Compose(tran_list)

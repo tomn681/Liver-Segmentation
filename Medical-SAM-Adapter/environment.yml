@@ -289,9 +289,9 @@ dependencies:
     - tokenizers==0.12.1
     - toml==0.10.2
     - tomli==2.0.1
-    - torch==1.12.1+cu113
+    - torch==1.13.1
     - torch-lucent==0.1.8
-    - torchvision==0.13.1+cu113
+    - torchvision==0.14.1
     - traitlets==5.9.0
     - transformers==4.21.3
     - typeguard==3.0.2

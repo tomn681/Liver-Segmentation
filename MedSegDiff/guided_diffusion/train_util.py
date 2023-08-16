@@ -76,6 +76,7 @@ class TrainLoop:
 
         self.step = 0
         self.resume_step = 0
+        self.epoch=0
         self.global_batch = self.batch_size * dist.get_world_size()
 
         self.sync_cuda = th.cuda.is_available()
@@ -169,12 +170,7 @@ class TrainLoop:
     def run_loop(self):
         i = 0
         data_iter = iter(self.dataloader)
-        while (
-            not self.lr_anneal_steps
-            or self.step + self.resume_step < self.lr_anneal_steps
-        ):
-
-
+        while (self.epoch<70):
             try:
                     batch, cond, name = next(data_iter)
             except StopIteration:
@@ -182,7 +178,8 @@ class TrainLoop:
                     # reinitialize data loader
                     data_iter = iter(self.dataloader)
                     batch, cond, name = next(data_iter)
-
+                    self.epoch+=1
+                    print("Dataset Acabado: ",self.epoch)
             self.run_step(batch, cond)
 
            
@@ -281,7 +278,7 @@ class TrainLoop:
             if dist.get_rank() == 0:
                 logger.log(f"saving model {rate}...")
                 if not rate:
-                    filename = f"savedmodel{(self.step+self.resume_step):06d}.pt"
+                    filename = f"savedmodel_{(self.step+self.resume_step):06d}.pt"
                 else:
                     filename = f"emasavedmodel_{rate}_{(self.step+self.resume_step):06d}.pt"
                 with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:

@@ -1193,6 +1193,8 @@ class DPM_Solver:
         out = self.model(torch.cat((self.img,x), dim=1).to(dtype = torch.float), t)
         if isinstance(out, tuple):
             x, cal = out
+            x=x.detach()
+            cal=cal.detach()
         if return_intermediate:
             return x, intermediates
         else:
