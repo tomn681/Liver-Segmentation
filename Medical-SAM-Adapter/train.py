@@ -31,8 +31,9 @@ import cfg
 from tqdm import tqdm
 from torch.utils.data import DataLoader, random_split
 from utils import *
+from collections import OrderedDict
 import function 
-
+import pandas as pd
 from albumentations.augmentations import transforms as trns
 from albumentations.augmentations import geometric
 from albumentations.core.composition import Compose, OneOf
@@ -146,21 +147,40 @@ if not os.path.exists(checkpoint_path):
 checkpoint_path = os.path.join(checkpoint_path, '{net}-{epoch}-{type}.pth')
 
 '''begain training'''
+logcsv = OrderedDict([
+        ('epoch', []),
+        ('loss', []),
+        ('iou', []),
+        ('dice',[]),
+        ('val_loss', []),
+        ('val_iou', []),
+        ('val_dice',[]),
+    ])
 best_acc = 0.0
 best_tol = 1e4
 for epoch in range(settings.EPOCH):
     if args.mod == 'sam_adpt':
         net.train()
         time_start = time.time()
-        loss, clicker = function.train_sam(args, net, optimizer, nice_train_loader, epoch, writer, vis = args.vis)
+        loss, clicker, (tiou, tdice) = function.train_sam(args, net, optimizer, nice_train_loader, epoch, writer, vis = args.vis)
         logger.info(f'Train loss: {loss}|| @ epoch {epoch}.')
         time_end = time.time()
         print('time_for_training ', time_end - time_start)
 
         net.eval()
-        if epoch and epoch % args.val_freq == 0 or epoch == settings.EPOCH-1:
+        if True:
             tol, (eiou, edice) = function.validation_sam(args, nice_test_loader, epoch, net, writer)
-            logger.info(f'Total score: {tol}, IOU: {eiou}, DICE: {edice} || @ epoch {epoch}. Clicker: {clicker}')
+            logger.info(f'Total score TRAIN: {loss}, IOU: {tiou}, DICE: {tdice} || @ epoch {epoch}. Clicker: {clicker}')
+            logger.info(f'Total score VAL: {tol}, IOU: {eiou}, DICE: {edice} || @ epoch {epoch}. Clicker: {clicker}')
+            logcsv['epoch'].append(epoch)
+            logcsv['loss'].append(loss.cpu().detach().numpy())
+            logcsv['iou'].append(tiou)
+            logcsv['dice'].append(tdice)
+            logcsv['val_loss'].append(tol.cpu().detach().numpy())
+            logcsv['val_iou'].append(eiou)
+            logcsv['val_dice'].append(edice)
+
+            pd.DataFrame(logcsv).to_csv('logcsv/log_V2_pt2.csv', index=False)
 
             if args.distributed != 'none':
                 sd = net.module.state_dict()

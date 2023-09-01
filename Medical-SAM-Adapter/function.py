@@ -76,8 +76,10 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
     ind = 0
     # train mode
     net.train()
+    ave_res, mix_res = (0,0,0,0), (0,0,0,0)
+    threshold = (0.1, 0.3, 0.5, 0.7, 0.9)
     optimizer.zero_grad()
-
+    n_train = len(train_loader)
     epoch_loss = 0
     GPUdevice = torch.device('cuda:' + str(args.gpu_device))
     device = GPUdevice
@@ -156,6 +158,8 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
               )
 
             loss = lossfunc(pred, masks)
+            temp = eval_seg(pred, masks, threshold)
+            mix_res = tuple([sum(a) for a in zip(mix_res, temp)])
 
             pbar.set_postfix(**{'loss (batch)': loss.item()})
             epoch_loss += loss.item()
@@ -169,13 +173,13 @@ def train_sam(args, net: nn.Module, optimizer, train_loader,
             if vis:
                 if ind % vis == 0:
                     namecat = 'Train'
-                    for na in name:
-                        namecat = namecat + na.split('/')[-1].split('.')[0] + '+'
+                    #for na in name:
+                    #    namecat = namecat + na.split('/')[-1].split('.')[0] + '+'
                     vis_image(imgs,pred,masks, os.path.join(args.path_helper['sample_path'], namecat+'epoch+' +str(epoch) + '.jpg'), reverse=False, points=showp)
 
             pbar.update()
 
-    return loss, clicker[-1]
+    return loss, clicker[-1],tuple([a/n_train for a in mix_res])
 
 def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
      # eval mode
@@ -281,7 +285,7 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
                         namecat = 'Test'
                         for na in name:
                             img_name = na.split('/')[-1].split('.')[0]
-                            namecat = namecat + img_name + '+'
+                            namecat = namecat + '+'
                         vis_image(imgs,pred, masks, os.path.join(args.path_helper['sample_path'], namecat+'epoch+' +str(epoch) + '.jpg'), reverse=False, points=showp)
                     
 

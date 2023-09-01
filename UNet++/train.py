@@ -9,6 +9,7 @@ import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.optim as optim
 import yaml
+import albumentations as A
 from albumentations.augmentations import transforms, geometric
 from albumentations.core.composition import Compose, OneOf
 from sklearn.model_selection import train_test_split
@@ -253,19 +254,15 @@ def main():
     train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
 
     train_transform = Compose([
-        geometric.rotate.RandomRotate90(),
-        geometric.transforms.Flip(),
-        OneOf([
-            transforms.HueSaturationValue(),
-            transforms.RandomBrightness(),
-            transforms.RandomContrast(),
-        ], p=1),
-        geometric.resize.Resize(config['input_h'], config['input_w']),
+        A.Resize(config['input_h'], config['input_w']),
+        A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0.1, p=0.5),
+        A.HorizontalFlip(p=0.5),
+        A.Rotate (limit=10, interpolation=1, border_mode=1, value=None, crop_border=False, always_apply=False, p=0.5),
         #transforms.Normalize(),
     ])
 
     val_transform = Compose([
-        geometric.resize.Resize(config['input_h'], config['input_w']),
+        A.Resize(config['input_h'], config['input_w']),
         #transforms.Normalize(),
     ])
 
