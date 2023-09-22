@@ -223,6 +223,7 @@ def main():
                                            config['deep_supervision'])
 
     model = model.cuda()
+    model.load_state_dict(torch.load("./models/liver_3ch/model.pth"))
 
     params = filter(lambda p: p.requires_grad, model.parameters())
     if config['optimizer'] == 'Adam':
