@@ -154,7 +154,7 @@ class LiTS2017(Dataset):
     def __getitem__(self, idx):
         img_id = self.img_ids[idx]
         
-        img = cv2.imread(os.path.join(self.img_dir, img_id + self.img_ext), cv2.IMREAD_GRAYSCALE)
+        img = cv2.imread(os.path.join(self.img_dir, img_id + self.img_ext), -1)
         if img.ndim == 2:
         	img = img[..., None]
 

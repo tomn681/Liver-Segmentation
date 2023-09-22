@@ -140,6 +140,7 @@ class LiverDataset(Dataset):
     def __getitem__(self, index):
     	img_id = self.img_ids[index]
     	img = cv2.imread(os.path.join(self.img_path, img_id + self.img_ext), -1)
+    	print(np.shape(img))
     	if img.ndim == 2:
        	    img = img[..., None]
     	mask = []
@@ -323,7 +324,7 @@ def main():
         prompt_encoder=sam_model.prompt_encoder,
     ).to(device)
     medsam_model.train()
-    #print(medsam_model)
+    print(medsam_model)
     print(
         "Number of total parameters: ",
         sum(p.numel() for p in medsam_model.parameters()),
@@ -394,9 +395,8 @@ def main():
             optimizer.load_state_dict(checkpoint["optimizer"])
     if args.use_amp:
         scaler = torch.cuda.amp.GradScaler()
-    print(f"start trainning , number of epochs:  {num_epochs}")
+
     for epoch in range(start_epoch, num_epochs):
-    	print(f"Epoch: {epoch}")
     	medsam_model.train()
     	epoch_loss = 0
     	ious=[]
@@ -449,7 +449,7 @@ def main():
     	log["iou"].append(epoch_iou)
     	log["val_loss"].append(val_epoch_loss)
     	log["val_iou"].append(val_epoch_iou)
-    	pd.DataFrame(log).to_csv('log_3ch_pt2.csv', index=False)
+    	pd.DataFrame(log).to_csv('log_3ch.csv', index=False)
 
     	if args.use_wandb:
             wandb.log({"epoch_loss": epoch_loss})
@@ -464,7 +464,7 @@ def main():
         }
     	torch.save(checkpoint, os.path.join(model_save_path, "medsam_model_latest.pth"))
         ## save the best model
-    	if val_epoch_iou > best_iou:
+    	if val_epoch_iou < best_iou:
             best_iou = val_epoch_iou
             checkpoint = {
                 "model": medsam_model.state_dict(),

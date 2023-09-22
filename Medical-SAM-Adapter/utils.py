@@ -82,14 +82,14 @@ from monai.transforms import (
 
 from monai.config import print_config
 from monai.metrics import DiceMetric
-from monai.networks.nets import SwinUNETR
+#from monai.networks.nets import SwinUNETR
 
 from monai.data import (
     ThreadDataLoader,
     CacheDataset,
     load_decathlon_datalist,
     decollate_batch,
-    set_track_meta,
+    #set_track_meta,
 )
 
 
@@ -230,7 +230,7 @@ def get_decath_loader(args):
     )
     val_loader = ThreadDataLoader(val_ds, num_workers=0, batch_size=1)
 
-    set_track_meta(False)
+    #set_track_meta(False)
 
     return train_loader, val_loader, train_transforms, val_transforms, datalist, val_files
 

@@ -394,7 +394,7 @@ def main():
             optimizer.load_state_dict(checkpoint["optimizer"])
     if args.use_amp:
         scaler = torch.cuda.amp.GradScaler()
-    print(f"start trainning , number of epochs:  {num_epochs}")
+    print("start trainning , number of epochs:  {num_epochs}")
     for epoch in range(start_epoch, num_epochs):
     	print(f"Epoch: {epoch}")
     	medsam_model.train()

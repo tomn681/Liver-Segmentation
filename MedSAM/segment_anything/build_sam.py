@@ -18,8 +18,10 @@ from .modeling import (
 )
 
 
-def build_sam_vit_h(checkpoint=None):
+def build_sam_vit_h(checkpoint=None,img_size=512,in_chans = 3):
     return _build_sam(
+        image_size=img_size,
+        in_chans = in_chans,
         encoder_embed_dim=1280,
         encoder_depth=32,
         encoder_num_heads=16,
@@ -31,8 +33,10 @@ def build_sam_vit_h(checkpoint=None):
 build_sam = build_sam_vit_h
 
 
-def build_sam_vit_l(checkpoint=None):
+def build_sam_vit_l(checkpoint=None,img_size=512,in_chans = 3):
     return _build_sam(
+        image_size=img_size,
+        in_chans = in_chans,
         encoder_embed_dim=1024,
         encoder_depth=24,
         encoder_num_heads=16,
@@ -41,8 +45,10 @@ def build_sam_vit_l(checkpoint=None):
     )
 
 
-def build_sam_vit_b(checkpoint=None):
+def build_sam_vit_b(checkpoint=None,img_size=512,in_chans = 3,):
     return _build_sam(
+        image_size=img_size,
+        in_chans = in_chans,
         encoder_embed_dim=768,
         encoder_depth=12,
         encoder_num_heads=12,
@@ -60,6 +66,8 @@ sam_model_registry = {
 
 
 def _build_sam(
+    image_size,
+    in_chans,
     encoder_embed_dim,
     encoder_depth,
     encoder_num_heads,
@@ -67,14 +75,15 @@ def _build_sam(
     checkpoint=None,
 ):
     prompt_embed_dim = 256
-    image_size = 1024
-    vit_patch_size = 16
+    image_size = image_size
+    vit_patch_size = 8#16
     image_embedding_size = image_size // vit_patch_size
     sam = Sam(
         image_encoder=ImageEncoderViT(
             depth=encoder_depth,
             embed_dim=encoder_embed_dim,
             img_size=image_size,
+            in_chans = in_chans,
             mlp_ratio=4,
             norm_layer=partial(torch.nn.LayerNorm, eps=1e-6),
             num_heads=encoder_num_heads,
@@ -141,6 +150,21 @@ def _build_sam(
 
     if checkpoint is not None:
         with open(checkpoint, "rb") as f:
-            state_dict = torch.load(f)
-        sam.load_state_dict(state_dict)
+            loaded_state_dict = torch.load(f)
+
+        state_dict = loaded_state_dict
+        model_state_dict = sam.state_dict()
+        is_changed = False
+        for k in state_dict:
+            if k in model_state_dict:
+                if state_dict[k].shape != model_state_dict[k].shape:
+                    print(f"Skip loading parameter: {k}, "
+                                f"required shape: {model_state_dict[k].shape}, "
+                                f"loaded shape: {state_dict[k].shape}")
+                    state_dict[k] = model_state_dict[k]
+                    is_changed = True
+            else:
+                print(f"Dropping parameter {k}")
+                is_changed = True
+        sam.load_state_dict(loaded_state_dict, strict=False)
     return sam
