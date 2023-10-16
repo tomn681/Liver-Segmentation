@@ -11,6 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 import cv2 
 from .graphDataLoader import getSeg, getHeart
+from utils.metrics import connectPoints, iou_score
 
 def natural_key(string_):
     """See http://www.codinghorror.com/blog/archives/001018.html"""
@@ -49,16 +50,21 @@ class LandmarksDataset(Dataset):
         img_name = self.images[idx]
         image = io.imread(img_name).astype('float') / 255.0
         image = np.expand_dims(image, axis=2)
-        
+
         label = img_name.replace(self.img_path, self.label_path).replace('.png', '.npy')
+#       print("label: ",label)
+#       print("img_name: ",img_name)
+
+
         landmarks = np.load(label)
         landmarks = landmarks.astype('float').reshape(-1, 2)
         
         sample = {'image': image, 'landmarks': landmarks}
 
+
+        size=image.shape[:2]
         if self.transform:
             sample = self.transform(sample)
-
         return sample
 
     
@@ -263,7 +269,6 @@ class ToTensor(object):
         image = image.transpose((2, 0, 1))
         landmarks = landmarks.reshape(-1, 2) / size
         landmarks = np.clip(landmarks, 0, 1)
-        
         return {'image': torch.from_numpy(image).float(),
                 'landmarks': torch.from_numpy(landmarks).float()}
     

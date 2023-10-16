@@ -6,13 +6,15 @@ import argparse
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
-
+import cv2
 import scipy.sparse as sp
 import numpy as np
-
+import pandas as pd
+from collections import OrderedDict
 from sklearn.metrics import mean_squared_error
 from utils.utils import scipy_to_torch_sparse, genMatrixes, genMatrixesLH, genMatrixesLiver
 from utils.dataLoader import LandmarksDataset, ToTensor, ToTensorLH, Rescale, RandomScale, AugColor, Rotate
+from utils.metrics import connectPoints, iou_score
 
 from models.hybridDoubleSkip import Hybrid as DoubleSkip
 from models.hybridSkip import Hybrid as Skip
@@ -75,6 +77,7 @@ def trainer(train_dataset, val_dataset, model, config):
     train_rec_loss_avg = []
     val_loss_avg = []
     val_hd_avg = []
+    val_iou_avg = []
 
     tensorboard = "Training"
         
@@ -90,13 +93,23 @@ def trainer(train_dataset, val_dataset, model, config):
     best = 1e12
     bestHD = 1e12
     bestMSE = 1e12
+    bestIoU = 0
     suffix = ".pt"
     
     print('Training ...')
         
     scheduler = StepLR(optimizer, step_size=config['stepsize'], gamma=config['gamma'])
     pool = Pool()
-    
+    log = OrderedDict([
+        ('epoch', []),
+        ('Loss',[]),
+        ('Loss_kld',[]),
+        ('MSE', []),
+        ('val_MSE', []),
+        ('val_hd', []),
+        ('val_iou', []),
+    ])
+
     for epoch in range(config['epochs']):
         model.train()
 
@@ -104,12 +117,13 @@ def trainer(train_dataset, val_dataset, model, config):
         train_rec_loss_avg.append(0)
         train_kld_loss_avg.append(0)
         num_batches = 0
-        
+        count=0
         for sample_batched in train_loader:
             image, target = sample_batched['image'].to(device), sample_batched['landmarks'].to(device)
+            size = image.shape
             out = model(image)
             target_down = pool(target, model.downsample_matrices[0])
-            
+
             optimizer.zero_grad()
             
             if type(out) is not tuple:
@@ -133,7 +147,6 @@ def trainer(train_dataset, val_dataset, model, config):
                 raise Exception('Error unpacking outputs')
 
             train_rec_loss_avg[-1] += outloss.item()
-            
             kld_loss = -0.5 * torch.mean(torch.mean(1 + model.log_var - model.mu ** 2 - model.log_var.exp(), dim=1), dim=0)
             loss += model.kld_weight * kld_loss
 
@@ -159,30 +172,37 @@ def trainer(train_dataset, val_dataset, model, config):
         model.eval()
         val_loss_avg.append(0)
         val_hd_avg.append(0)
+        val_iou_avg.append(0)
 
         with torch.no_grad():
             for sample_batched in val_loader:
                 image, target = sample_batched['image'].to(device), sample_batched['landmarks'].to(device)
-
+                size=image.shape[-2:]
                 out = model(image)
                 if len(out) > 1:
                     out = out[0]
 
                 out = out.reshape(-1, 2)
                 target = target.reshape(-1, 2)
-                
-                dist = hd_landmarks(out, target, config['inputsize'])
-                val_hd_avg[-1] += dist 
 
+
+
+                outiou=iou_score(out.cpu().numpy(), target.cpu().numpy(),size)
+
+                dist = hd_landmarks(out, target, config['inputsize'])
+                val_iou_avg[-1]+=outiou
+                val_hd_avg[-1] += dist 
                 loss_rec = mean_squared_error(out.cpu().numpy(), target.cpu().numpy())
                 val_loss_avg[-1] += loss_rec
                 num_batches += 1   
                 loss_rec = 0
 
+
         val_loss_avg[-1] /= num_batches
         val_hd_avg[-1] /= num_batches
+        val_iou_avg[-1] /= num_batches
         
-        print('Epoch [%d / %d] validation average reconstruction error: %f' % (epoch+1, config['epochs'], val_loss_avg[-1] * 512 * 512))
+        print('Epoch [%d / %d] validation average reconstruction error: %f,iou: %f' % (epoch+1, config['epochs'], val_loss_avg[-1] * 512 * 512,val_iou_avg[-1]))
 
         writer.add_scalar('Train/Loss', train_loss_avg[-1], epoch)
         writer.add_scalar('Train/Loss kld', train_kld_loss_avg[-1], epoch)
@@ -190,7 +210,21 @@ def trainer(train_dataset, val_dataset, model, config):
         
         writer.add_scalar('Validation/MSE', val_loss_avg[-1]  * 512 * 512, epoch)
         writer.add_scalar('Validation/Hausdorff Distance', val_hd_avg[-1], epoch)
+
+
+        log['epoch'].append(epoch)
+        log['Loss'].append(train_loss_avg[-1])
+        log['Loss_kld'].append(train_kld_loss_avg[-1])
+        log['MSE'].append(train_rec_loss_avg[-1])
+        log['val_MSE'].append(val_loss_avg[-1])
+        log['val_hd'].append(val_hd_avg[-1])
+        log['val_iou'].append(val_iou_avg[-1])
         
+
+        pd.DataFrame(log).to_csv(f'{folder}/log.csv', index=False)
+
+
+
         if epoch % 500 == 0:
             suffix = "_%s.pt" % epoch
             best = 1e12
@@ -200,6 +234,13 @@ def trainer(train_dataset, val_dataset, model, config):
             best = val_loss_avg[-1]
             print('Model Saved MSE')
             out = "bestMSE.pt"
+            torch.save(model.state_dict(), os.path.join(folder, out.replace('.pt',suffix)))
+
+
+        if val_iou_avg[-1] > bestIoU:
+            bestIoU = val_iou_avg[-1]
+            print('Model Saved IoU')
+            out = "bestIoU.pt"
             torch.save(model.state_dict(), os.path.join(folder, out.replace('.pt',suffix)))
 
         if val_loss_avg[-1] < bestMSE:
@@ -212,7 +253,8 @@ def trainer(train_dataset, val_dataset, model, config):
             print('Model Saved HD')
             out = "bestHD.pt"
             torch.save(model.state_dict(), os.path.join(folder, out.replace('.pt',suffix)))
-
+        last="last_IoU.pt"
+        torch.save(model.state_dict(), os.path.join(folder, last.replace('.pt',suffix)))
         scheduler.step()
     
     torch.save(model.state_dict(), os.path.join(folder, "final.pt"))
@@ -228,7 +270,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", default = 1e-4, type = float)
     parser.add_argument("--stepsize", default = 50, type = int)
     parser.add_argument("--gamma", default = 0.9, type = float)
-    
+    parser.add_argument("--batch_size",default=4,type=int)
     # Number of filters at low resolution
     parser.add_argument("--f", default = 32, type=int)
     # K-hops parameter
@@ -276,11 +318,11 @@ if __name__ == "__main__":
     config['window'] = (W,W)
     
     if config['extended']:
-        train_path = "../datasets/Lits/imgs_1ch/liver_only/full_data"
-        val_path = "../datasets/Lits/imgs_1ch/liver_only/full_data/val" 
+        train_path = "../../../Data/liver_only/full_data"
+        val_path = "../../../Data/liver_only/full_data/val" 
     else:
-        train_path = "../datasets/Lits/imgs_1ch/liver_only/split_1"
-        val_path = "../datasets/Lits/imgs_1ch/liver_only/split_1/val" 
+        train_path = "../../../Data/liver_only/split_1"
+        val_path = "../../../Data/liver_only/split_1/val" 
         
     img_path = os.path.join(train_path, 'images')
     label_path = os.path.join(train_path, 'masks_land')
@@ -289,6 +331,7 @@ if __name__ == "__main__":
                                      label_path=label_path,
                                      transform = transforms.Compose([
                                                  #RandomScale(),
+                                                 Rescale(inputSize),
                                                  Rotate(3),
                                                  AugColor(0.40),
                                                  ToTensor()])
@@ -326,7 +369,6 @@ if __name__ == "__main__":
     A_t, D_t, U_t = ([scipy_to_torch_sparse(x).to('cuda:0') for x in X] for X in (A_, D_, U_))
     
     config['latents'] = 64
-    config['batch_size'] = 4
     config['val_batch_size'] = 1
     config['weight_decay'] = 1e-5
     
