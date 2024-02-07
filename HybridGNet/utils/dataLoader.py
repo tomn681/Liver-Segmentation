@@ -49,8 +49,9 @@ class LandmarksDataset(Dataset):
 
         img_name = self.images[idx]
         image = io.imread(img_name).astype('float') / 255.0
-        image = np.expand_dims(image, axis=2)
-
+        if len(np.shape(image))<3:
+        	image = np.expand_dims(image, axis=2)
+        
         label = img_name.replace(self.img_path, self.label_path).replace('.png', '.npy')
 #       print("label: ",label)
 #       print("img_name: ",img_name)
@@ -65,6 +66,7 @@ class LandmarksDataset(Dataset):
         size=image.shape[:2]
         if self.transform:
             sample = self.transform(sample)
+        #print(np.shape(sample["image"]))
         return sample
 
     

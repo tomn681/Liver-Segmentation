@@ -180,7 +180,7 @@ for epoch in range(settings.EPOCH):
             logcsv['val_iou'].append(eiou)
             logcsv['val_dice'].append(edice)
 
-            pd.DataFrame(logcsv).to_csv('logcsv/log_c3.csv', index=False)
+            pd.DataFrame(logcsv).to_csv('logcsv/log_test.csv', index=False)
 
             if args.distributed != 'none':
                 sd = net.module.state_dict()

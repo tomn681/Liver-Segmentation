@@ -27,6 +27,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', default="../../../Data/liver_only",help='path data validation')
     parser.add_argument('--out_path', default="../../../Data/results_val",help='path checkpoints')
+   #parser.add_argument('--check_path', default="./work_dir/other_train/medsam_model_latest.pth",help='path checkpoints')
     parser.add_argument('--check_path', default="./work_dir/latests_model/medsam_model_latest.pth",help='path checkpoints')
     parser.add_argument('--num_classes', default=1,help='classes')
     parser.add_argument('--input_channels', default=1,help='input channels')
@@ -150,6 +151,7 @@ def model_MedSAM(args):
         prompt_encoder=sam_model.prompt_encoder,
     ).cuda()
     medsam_model.load_state_dict(torch.load(args.check_path)["model"])
+    print("epoch: ",torch.load(args.check_path)["epoch"])
     return medsam_model
 
 
@@ -186,9 +188,7 @@ def main():
 
     log = OrderedDict([
         ('name', []),
-        ('model', []),
         ('iou', []),
-        ('dice', []),
     ])
 
 
@@ -199,31 +199,17 @@ def main():
             output = model(image, boxes_np)
             meta=name[0].split("_")[1]
             iou = iou_score(output, target)
-            dice=dice_coef(output, target)
-
-            avg_meter.update(iou, image.size(0))
-            avg_meter_dice.update(dice, image.size(0))
-            if meta[0]=="CSM":
-                avg_meter_CSM.update(iou, image.size(0))
-                avg_meter_dice_CSM.update(dice, image.size(0))
-            elif meta[0]=="KITS":  
-                avg_meter_KITS.update(iou, image.size(0))
-                avg_meter_dice_KITS.update(dice, image.size(0))
-            pred_img=output.detach().cpu().numpy()[0][0,:,:]*255
-            _,pred_img=cv2.threshold(pred_img,10,255,cv2.THRESH_BINARY)
+            avg_meter_val.update(iou, image.size(0))
+            pred_img=output.detach().cpu().numpy()[0][0,:,:]
+            pred_img[pred_img>0.5]=255
             log['name'].append(name[0])
-            log['model'].append("MedSAM")
             log['iou'].append(iou)
-            log['dice'].append(dice)
-            cv2.imwrite(f"{args.out_path}/msk_pred/MedSAM/{name[0]}.png",pred_img)
+            cv2.imwrite(f"{args.out_path}/msk_pred/MedSAM/{name[0]}_Normal.png",target.detach().cpu().numpy()[0][0,:,:])
+            cv2.imwrite(f"{args.out_path}/msk_pred/MedSAM/{name[0]}_pred.png",output.detach().cpu().numpy()[0][0,:,:])
 
-    pd.DataFrame(log).to_csv(f'{args.out_path}/csv/log_MedSAM.csv', index=False)
+ #   pd.DataFrame(log).to_csv(f'{args.out_path}/csv/log_MedSAM.csv', index=False)
 
-    print('IoU: %.4f' % avg_meter.avg)
-    print('IoU CSM: %.4f' % avg_meter_CSM.avg)
-    print('IoU KITS: %.4f' % avg_meter_KITS.avg)
-    print('DICE CSM: %.4f' % avg_meter_dice_CSM.avg)
-    print('DICE KITS: %.4f' % avg_meter_dice_KITS.avg)
+    print('IoU val: %.4f' % avg_meter_val.avg)
 
 
 if __name__ == "__main__":

@@ -123,9 +123,12 @@ class LiverDataset(Dataset):
         self.data_root = data_root
         img_ids = glob(os.path.join(data_root, 'images', '*'+img_ext))
         img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
+
         train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
         
         self.img_ids = train_img_ids if mode == 'Training' else val_img_ids
+        #self.img_ids = train_img_ids if mode == 'Training' else img_ids
+
         self.img_ext = img_ext
         self.mask_ext = msk_ext
         self.img_path = os.path.join(data_root, 'images')
@@ -174,7 +177,7 @@ class LiverDataset(Dataset):
         )
 
 # %% sanity test of dataset class
-tr_dataset = LiverDataset(data_root="../../Data/liver_only", mode = 'Test')
+tr_dataset = LiverDataset(data_root="../../../Data/liver_only", mode = 'Test')
 tr_dataloader = DataLoader(tr_dataset, batch_size=8, shuffle=True)
 for step, (image, gt, bboxes, names_temp) in enumerate(tr_dataloader):
     print(image.shape, gt.shape, bboxes.shape)
@@ -209,6 +212,12 @@ parser.add_argument(
     default="../../Data/liver_only",
     help="path to training image files; two subfolders: mask/0 and imgs",
 )
+parser.add_argument(
+    "--data_val_path",
+    type=str,
+    default="../../Data/liver_only_val",
+    help="path to validaion image files; two subfolders: mask/0 and imgs",
+)
 parser.add_argument("-task_name", type=str, default="MedSAM-ViT-B")
 parser.add_argument("-model_type", type=str, default="vit_b")
 parser.add_argument(
@@ -234,6 +243,7 @@ parser.add_argument(
 parser.add_argument(
     "-lr", type=float, default=0.0001, metavar="LR", help="learning rate (absolute lr)"
 )
+parser.add_argument("-results_folder", type=str, default="", help="folder for output results")
 parser.add_argument(
     "-use_wandb", type=bool, default=False, help="use wandb to monitor training"
 )
@@ -311,7 +321,7 @@ class MedSAM(nn.Module):
 
 
 def main():
-    os.makedirs(model_save_path, exist_ok=True)
+    #os.makedirs(model_save_path, exist_ok=True)
     shutil.copyfile(
         __file__, os.path.join(model_save_path, run_id + "_" + os.path.basename(__file__))
     )
@@ -351,7 +361,7 @@ def main():
     iter_num = 0
     losses = []
     best_loss = 1e10
-    best_iou=1e10
+    best_iou=0
 
     transform_train_lits = Compose([
 	    A.Resize(args.img_size, args.img_size),
@@ -366,11 +376,17 @@ def main():
 	    #trns.Normalize(),
 	])
 
+
+    if args.results_folder and not os.path.exists(args.results_folder):
+    	os.mkdir(args.results_folder)
+
+
+
     lits_train_dataset = LiverDataset(args.data_path, transform = transform_train_lits, mode = 'Training')
     lits_val_dataset = LiverDataset(args.data_path, transform = transform_val_lits, mode = 'Test')
 
     nice_train_loader = DataLoader(lits_train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
-    nice_val_loader = DataLoader(lits_val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+    nice_val_loader = DataLoader(lits_val_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
 
     print("Number of training samples: ", len(lits_train_dataset))
     print("Number of validation samples: ", len(lits_val_dataset))
@@ -426,18 +442,24 @@ def main():
 
             epoch_loss += loss.item()
             iter_num += 1
-
     	val_ious=[]
     	val_epoch_loss=0
     	medsam_model.eval()
+    	name_folder_results=os.path.join(args.results_folder,str(epoch))
+    	if not os.path.exists(name_folder_results):
+    		os.mkdir(name_folder_results)
+
+
     	with torch.no_grad():
-	        for step, (image, gt2D, boxes, _) in enumerate(tqdm(nice_val_loader)):
+	        for step, (image, gt2D, boxes, img_id) in enumerate(tqdm(nice_val_loader)):
 	            boxes_np = boxes.detach().cpu().numpy()
 	            image, gt2D = image.to(device), gt2D.to(device)
 	            medsam_pred = medsam_model(image, boxes_np)
 	            loss = seg_loss(medsam_pred, gt2D) + ce_loss(medsam_pred, gt2D.float())
 	            val_epoch_loss+=loss.item()
 	            val_ious.append(iou_score(medsam_pred, gt2D))
+	            if args.results_folder:
+	            	cv2.imwrite(os.path.join(name_folder_results,img_id[0])+".png",medsam_pred.detach().cpu().numpy()[0][0,:,:])
 
     	epoch_loss /= step
     	val_epoch_loss/=step
@@ -449,8 +471,8 @@ def main():
     	log["iou"].append(epoch_iou)
     	log["val_loss"].append(val_epoch_loss)
     	log["val_iou"].append(val_epoch_iou)
-    	pd.DataFrame(log).to_csv('log_3ch_pt2.csv', index=False)
-
+    	print("iou: ",val_epoch_iou)
+    	pd.DataFrame(log).to_csv('log_test_remove.csv', index=False)
     	if args.use_wandb:
             wandb.log({"epoch_loss": epoch_loss})
     	print(
@@ -465,6 +487,7 @@ def main():
     	torch.save(checkpoint, os.path.join(model_save_path, "medsam_model_latest.pth"))
         ## save the best model
     	if val_epoch_iou > best_iou:
+            print("NEW BEST IOU : ",val_epoch_iou)
             best_iou = val_epoch_iou
             checkpoint = {
                 "model": medsam_model.state_dict(),

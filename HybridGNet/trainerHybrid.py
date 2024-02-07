@@ -62,7 +62,7 @@ def hd_landmarks(out, label, size = 512):
 def trainer(train_dataset, val_dataset, model, config):
     torch.manual_seed(420)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     print(device)
 
     model = model.to(device)
@@ -221,7 +221,7 @@ def trainer(train_dataset, val_dataset, model, config):
         log['val_iou'].append(val_iou_avg[-1])
         
 
-        pd.DataFrame(log).to_csv(f'{folder}/log.csv', index=False)
+        pd.DataFrame(log).to_csv(f'{folder}/log_250.csv', index=False)
 
 
 
@@ -366,7 +366,7 @@ if __name__ == "__main__":
         config['n_nodes'] = [N1, N1, N1, N1, N1, N1]
         A_ = [A.copy(), A.copy(), A.copy(), A.copy(), A.copy(), A.copy()]
     
-    A_t, D_t, U_t = ([scipy_to_torch_sparse(x).to('cuda:0') for x in X] for X in (A_, D_, U_))
+    A_t, D_t, U_t = ([scipy_to_torch_sparse(x).to('cuda:1') for x in X] for X in (A_, D_, U_))
     
     config['latents'] = 64
     config['val_batch_size'] = 1

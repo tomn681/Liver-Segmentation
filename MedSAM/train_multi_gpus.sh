@@ -1,15 +1,13 @@
 #!/bin/bash
-#SBATCH --nodes=5
-#SBATCH --ntasks=5
+#SBATCH --nodes=3
+#SBATCH --ntasks=3
 #SBATCH --cpus-per-task=24
-#SBATCH --job-name=n-5nodes
-#SBATCH --mem=200GB
-#SBATCH --gres=gpu:4
-#SBATCH --partition=a100
+#SBATCH --job-name=n-3nodes
+#SBATCH --mem=60GB
+#SBATCH --gres=gpu:2
 #SBATCH --output=logs/mgpus_%x-%j.out
 #SBATCH --error=logs/mgpus_%x-%j.err
 #SBATCH --time=20-00:00:00
-#SBATCH --exclude=gpu101,gpu113
 
 set -x -e
 
@@ -62,13 +60,13 @@ echo "SLURM_SUBMIT_DIR"=$SLURM_SUBMIT_DIR
 echo SLURM_NTASKS=$SLURM_NTASKS
 
 
-for (( i=0; i < $SLURM_NTASKS; ++i ))
+for $(( i=0; i < $SLURM_NTASKS; ++i ))
 do
-    /opt/slurm/bin/srun -lN1 --mem=200G --gres=gpu:4 -c $SLURM_CPUS_ON_NODE -N 1 -n 1 -r $i bash -c \
+    /opt/slurm/bin/srun -lN1 --mem=60G --gres=gpu:4 -c $SLURM_CPUS_ON_NODE -N 1 -n 1 -r $i bash -c \
     "python train_multi_gpus.py \
-        -task_name MedSAM-ViT-B-20GPUs \
-        -work_dir ./work_dir \
-        -batch_size 8 \
+        -task_name MedSAM-ViT-B-noprompt \
+        -work_dir ./work_dir_new \
+        -batch_size 16 \
         -num_workers 8 \
         --world_size ${WORLD_SIZE} \
         --bucket_cap_mb 25 \

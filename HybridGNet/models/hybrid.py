@@ -19,7 +19,7 @@ class EncoderConv(nn.Module):
         
         self.maxpool = nn.MaxPool2d(2)
         
-        self.dconv_down1 = residualBlock(1, size[0])
+        self.dconv_down1 = residualBlock(3, size[0])
         self.dconv_down2 = residualBlock(size[0], size[1])
         self.dconv_down3 = residualBlock(size[1], size[2])
         self.dconv_down4 = residualBlock(size[2], size[3])
