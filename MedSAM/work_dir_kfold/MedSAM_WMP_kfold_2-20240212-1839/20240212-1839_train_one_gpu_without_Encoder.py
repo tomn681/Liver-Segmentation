@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import monai
-from segment_anything import sam_model_registry
+from segment_anything2 import sam_model_registry
 import torch.nn.functional as F
 from sklearn.model_selection import train_test_split
 import cv2
@@ -123,20 +123,18 @@ class LiverDataset(Dataset):
         self.data_root = data_root
         self.kfold=kfold
         if self.kfold:
-                train_img_ids=[]
-                kfolders=os.listdir(data_root)
-                kfolders.remove(f"fold_{kfold}")
-                for kfolder in kfolders:
-                        data_kfolders=  os.path.join(data_root,kfolder)
-                        kfold_img_ids = glob(os.path.join(data_kfolders, 'images', '*'+img_ext))
-                        train_img_ids.extend(kfold_img_ids)
-                val_img_ids=glob(os.path.join(data_root,f"fold_{kfold}", 'images', '*'+img_ext))
-                train_img_ids = [[p.split("/")[-3],os.path.splitext(p.split("/")[-1])[0]] for p in train_img_ids]
-                val_img_ids= [[p.split("/")[-3],os.path.splitext(p.split("/")[-1])[0]] for p in val_img_ids]
-                self.img_path = data_root
-                self.gt_path = data_root
-                print(f"number of training folders = ",len(kfolders),len(train_img_ids),kfolders)
-                print(f"number of validation folder = ",1,len(val_img_ids),f"fold_{kfold}")
+	        train_img_ids=[]
+	        kfolders=os.listdir(data_root)
+	        kfolders.remove(f"fold_{kfold}")
+	        for kfolder in kfolders:
+		        data_kfolders=	os.path.join(data_root,kfolder)
+		        kfold_img_ids = glob(os.path.join(data_kfolders, 'images', '*'+img_ext))
+		        train_img_ids.extend(kfold_img_ids)
+	        val_img_ids=glob(os.path.join(data_root,f"fold_{kfold}", 'images', '*'+img_ext))
+	        train_img_ids = [[p.split("/")[-3],os.path.splitext(p.split("/")[-1])[0]] for p in train_img_ids]
+	        val_img_ids= [[p.split("/")[-3],os.path.splitext(p.split("/")[-1])[0]] for p in val_img_ids]
+	        self.img_path = data_root
+	        self.gt_path = data_root
 
         else:
                 img_ids = glob(os.path.join(data_root, 'images', '*'+img_ext))
@@ -149,42 +147,44 @@ class LiverDataset(Dataset):
         self.img_ext = img_ext
         self.mask_ext = msk_ext
         self.num_classes = num_classes
+
         self.transform = transform
         print(f"number of images: {len(self.img_ids)}")
+
     def __len__(self):
         return len(self.img_ids)
 
     def __getitem__(self, index):
-        img_id = self.img_ids[index]
-        name_img = os.path.join(self.img_path,img_id[0],"images",img_id[1] + self.img_ext) if self.kfold \
-                   else os.path.join(self.img_path,img_id + self.img_ext)
-        img = cv2.imread(name_img, -1)
-        if img.ndim == 2:
-            img = img[..., None]
-        mask = []
-        for i in range(self.num_classes):
+    	img_id = self.img_ids[index]
+    	name_img = os.path.join(self.img_path,img_id[0],"images",img_id[1] + self.img_ext) if self.kfold \
+    	    	   else os.path.join(self.img_path,img_id + self.img_ext)
+    	img = cv2.imread(name_img, -1)
+    	if img.ndim == 2:
+       	    img = img[..., None]
+    	mask = []
+    	for i in range(self.num_classes):
             name_mask = os.path.join(self.gt_path,img_id[0],"masks",str(i),img_id[1] + self.mask_ext) if self.kfold \
                         else os.path.join(self.gt_path, str(i),img_id + self.mask_ext)
             mask_pre=cv2.imread(name_mask, cv2.IMREAD_GRAYSCALE)
             _,mask_post=cv2.threshold(mask_pre,5,255,cv2.THRESH_BINARY)
             mask.append(mask_post[..., None])
-        mask = np.dstack(mask)
+    	mask = np.dstack(mask)
 
-        if self.transform is not None:
+    	if self.transform is not None:
             augmented = self.transform(image=img, mask=mask)
             img = augmented['image']
             mask = augmented['mask']
         
-        img = img.astype('float32') / 255
-        img = img.transpose(2, 0, 1)
-        mask = mask.astype('float32') / 255
-        mask = mask.transpose(2, 0, 1)
+    	img = img.astype('float32') / 255
+    	img = img.transpose(2, 0, 1)
+    	mask = mask.astype('float32') / 255
+    	mask = mask.transpose(2, 0, 1)
 
         # load npy image (1024, 1024, 3), [0,1]
         # convert the shape to (3, H, W)
-        gt2D = mask # only one label, (256, 256)
+    	gt2D = mask # only one label, (256, 256)
     	#assert np.max(gt2D) == 1 and np.min(gt2D) == 0.0, "ground truth should be 0, 1"
-        return (
+    	return (
             torch.tensor(img).float(),
             torch.tensor(gt2D).long(),
             img_id,
@@ -296,7 +296,6 @@ class MedSAM(nn.Module):
         self,
         image_encoder,
         mask_decoder,
-        prompt_encoder,
     ):
         super().__init__()
         self.image_encoder = image_encoder
@@ -315,29 +314,19 @@ class MedSAM(nn.Module):
         #	print(name,param.requires_grad)
 
         self.mask_decoder = mask_decoder
-        self.prompt_encoder = prompt_encoder
         # freeze prompt encoder
-        for param in self.prompt_encoder.parameters():
-            param.requires_grad = False
+        #for param in self.prompt_encoder.parameters():
+        #    param.requires_grad = False
 
     def forward(self, image):
         # do not compute gradients for encoder and prompt encoder
         image_embedding = self.image_encoder(image)  # (B, 256, 64, 64)
-        with torch.no_grad():
+        #with torch.no_grad():
             #box_torch = torch.as_tensor(box, dtype=torch.float32, device=image.device)
             #if len(box_torch.shape) == 2:
             #    box_torch = box_torch[:, None, :]  # (B, 1, 4)
-            sparse_embeddings, dense_embeddings = self.prompt_encoder(
-                points=None,
-                #boxes=box_torch,
-                boxes=None,
-                masks=None,
-            )
         low_res_masks, _ = self.mask_decoder(
             image_embeddings=image_embedding,  # (B, 256, 64, 64)
-            image_pe=self.prompt_encoder.get_dense_pe(),  # (1, 256, 64, 64)
-            sparse_prompt_embeddings=sparse_embeddings,  # (B, 2, 256)
-            dense_prompt_embeddings=dense_embeddings,  # (B, 256, 64, 64)
             multimask_output=False,
         )
         ori_res_masks = F.interpolate(
@@ -359,7 +348,6 @@ def main():
     medsam_model = MedSAM(
         image_encoder=sam_model.image_encoder,
         mask_decoder=sam_model.mask_decoder,
-        prompt_encoder=sam_model.prompt_encoder,
     ).to(device)
    
     
