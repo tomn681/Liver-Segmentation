@@ -65,10 +65,6 @@ Note: extended uses the whole data, if this is not added, the model will be trai
 
 --load
 
-# MedSegDiff
-
-![workflow](MedSegDiff/figs/medsegdiff_showcase.gif)
-
 ## Training
 
 # UNet++
