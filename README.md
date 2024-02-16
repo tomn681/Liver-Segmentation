@@ -71,3 +71,57 @@ Note: extended uses the whole data, if this is not added, the model will be trai
 
 ## Training
 
+# UNet++
+
+## Training
+
+### Training from scratch
+``` python
+python3 trainerHybrid.py --name HybridGNet --inputsize 512 --extended --epochs 100
+```
+
+# nnUNet
+
+## Training
+
+### Training from scratch
+``` python
+python3 trainerHybrid.py --name HybridGNet --inputsize 512 --extended --epochs 100
+```
+
+
+# UNET-EffB0
+
+## Training
+
+### Training from scratch
+``` python
+python3 trainerHybrid.py --name HybridGNet --inputsize 512 --extended --epochs 100
+```
+
+# MaskFormer (SWIN)
+
+## Training
+
+### Training from scratch
+``` python
+python3 trainerHybrid.py --name HybridGNet --inputsize 512 --extended --epochs 100
+```
+
+# Mask2Former (SWIN)
+
+## Training
+
+### Training from scratch
+``` python
+python3 trainerHybrid.py --name HybridGNet --inputsize 512 --extended --epochs 100
+```
+
+# TotalSegmentator
+
+## Training
+
+### Training from scratch
+``` python
+python3 trainerHybrid.py --name HybridGNet --inputsize 512 --extended --epochs 100
+```
