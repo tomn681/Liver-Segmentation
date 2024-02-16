@@ -5,18 +5,20 @@ Experimental platform over liver segmentation algorithms in CT scans.
 
 | Model      | Cuts per Image | Batch Size | Epoch | Val_IoU |
 |------------|:--------------:|:----------:|:-----:|:-------:|
-| MSA        |        1       |      4     |   88  |  0.669  |
-| MSA        |        3       |            |       |         |
-| MedSAM     |        1       |            |       |         |
-| MedSAM     |        3       |            |       |         |
-| UNet++     |        1       |      8     |   91  |  0.588  |
-| UNet++     |        3       |            |       |         |
-| MedSegDiff |        1       |            |       |         |
-| MedSegDiff |        3       |            |       |         |
-| UNetr      |        1       |            |       |         |
-| Unetr      |        3       |            |       |         |
-| HybridGNet |        1       |      4     |  N/A  |   N/A   |
-| HybridGNet |        3       |            |       |         |
+| MSA        |        1       |      36     |   145  |  0.935  |
+| MSA        |        3       |      36     |   98   |   0.937 |
+| MedSAM     |        1       |       4     |   29   |    0.952|
+| MedSAM     |        3       |       4     |   39   |   0.960 |
+| UNet++     |        1       |      18     |   91   |  0.948  |
+| UNet++     |        3       |      18     |   59   | 0.949   |
+| nnUNET     |        1       |      120    |   68   | 0.950   |
+| nnUNET     |        3       |      120    |   67   |  0.959  |
+| UNET-EffB0 |        1       |      16     |  143   |  0.959  |
+| UNET-EffB0 |        3       |      16     |  263   |  0.970  |
+| HybridGNet |        1       |      120    |  129   |   0.566 |
+| HybridGNet |        3       |      120    |  148   |   0.627 |
+| MaskFormer (SWIN) |     1    |  8        |      23800    |  0.948   |
+| Mask2Former (SWIN) |    1    |  8       |      24200    |  0.947   |
 
 # MedSAM
 
